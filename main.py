@@ -1,110 +1,102 @@
 from pieces import Pawn, Rook, Knight, Bishop, Queen, King
+row_labels = {1:'A', 2:'B', 3:'C', 4:'D', 5:'E', 6:'F', 7:'G', 8:'H'}
 
 class Square:
-    def __init__(self, colour, row, column, piece=False):
+    def __init__(self, colour, row, col):
         self.colour = colour
-        self.piece = False
-        self.row = row
-        self.column = column
+        self.occupied = False
+        self.location = (row, col)
+        self.label = f'{row_labels[row]}{col}'
 
     def __str__(self):
-        if self.piece:
-            return str(self.piece)
-        else:
-            return '    '
+        return str((self.location, self.label, self.occupied))
 
 class Board:
     def __init__(self):
-        self.board = []
-        for i in range(4):
-            self.board.append(self.new_row('w', 8-2*i))
-            self.board.append(self.new_row('b', 8-2*i-1))
-        self.lookup_table = self._create_lookup_table()
+        self.squares = {}
+        self.pieces = []
 
-    @staticmethod
-    def new_row(initial_colour, column_num):
-        row = []
-        if initial_colour == 'w':
-            for i in range(4):
-                row.append(Square('w', 2*i+1, column_num))
-                row.append(Square('b', 2*i+2, column_num))
-        elif initial_colour == 'b':
-            for i in range(4):
-                row.append(Square('b', 2*i+1, column_num))
-                row.append(Square('w', 2*i+2, column_num))
-        else:
-            raise ValueError("Colour provided not white or black")
-        return row
-
-    def _create_lookup_table(self):
-        row_letters = {1:'A', 2:'B', 3:'C', 4:'D', 5:'E', 6:'F', 7:'G', 8:'H'}
-        table = {}
-        for row in self.board:
-            for square in row:
-                location = f'{row_letters[square.row]}{square.column}'
-                table[location] = square
-        return table
-
-    def add_pieces(self):
-        self.lookup_table['A8'].piece = Rook('b')
-        self.lookup_table['B8'].piece = Knight('b')
-        self.lookup_table['C8'].piece = Bishop('b')
-        self.lookup_table['D8'].piece = Queen('b')
-        self.lookup_table['E8'].piece = King('b')
-        self.lookup_table['F8'].piece = Bishop('b')
-        self.lookup_table['G8'].piece = Knight('b')
-        self.lookup_table['H8'].piece = Rook('b')
-
-        self.lookup_table['A7'].piece = Pawn('b')
-        self.lookup_table['B7'].piece = Pawn('b')
-        self.lookup_table['C7'].piece = Pawn('b')
-        self.lookup_table['D7'].piece = Pawn('b')
-        self.lookup_table['E7'].piece = Pawn('b')
-        self.lookup_table['F7'].piece = Pawn('b')
-        self.lookup_table['G7'].piece = Pawn('b')
-        self.lookup_table['H7'].piece = Pawn('b')
-
-        self.lookup_table['A1'].piece = Rook('w')
-        self.lookup_table['B1'].piece = Knight('w')
-        self.lookup_table['C1'].piece = Bishop('w')
-        self.lookup_table['D1'].piece = Queen('w')
-        self.lookup_table['E1'].piece = King('w')
-        self.lookup_table['F1'].piece = Bishop('w')
-        self.lookup_table['G1'].piece = Knight('w')
-        self.lookup_table['H1'].piece = Rook('w')
-
-        self.lookup_table['A2'].piece = Pawn('w')
-        self.lookup_table['B2'].piece = Pawn('w')
-        self.lookup_table['C2'].piece = Pawn('w')
-        self.lookup_table['D2'].piece = Pawn('w')
-        self.lookup_table['E2'].piece = Pawn('w')
-        self.lookup_table['F2'].piece = Pawn('w')
-        self.lookup_table['G2'].piece = Pawn('w')
-        self.lookup_table['H2'].piece = Pawn('w')
+    def _make_board(self):
+        colours = ['b', 'w']
+        for row in range(1,9):
+            for col in range(1,9):
+                self.squares[f'{row_labels[row]}{col}'] = Square(colours[(row+col)%2], row, col)
+                # (row+col)%2 ensures the colour switches in the correct way
 
 
-    def __getitem__(self, location):
-        return self.lookup_table[location]
+    def __getitem__(self, coords):
+        row = coords[0]
+        col = coords[1]
+        return self.squares[f'{row_labels[row]}{col}']
+
+    def reset(self):
+        self.squares, self.pieces = {}, []
+        self._make_board()
+        # add black pawns
+        for col in range(1,9):
+            curr_square = self.squares[f'{row_labels[7]}{col}']
+            curr_square.occupied = True
+            self.pieces.append(Pawn('b', curr_square))
+
+        # add white pawns
+        for col in range(1, 9):
+            curr_square = self.squares[f'{row_labels[2]}{col}']
+            curr_square.occupied = True
+            self.pieces.append(Pawn('w', curr_square))
+
+        # add other black pieces
+        self.pieces.append(Rook('b', self.squares['A8']))
+        self.squares['A8'].occupied = True
+
+        self.pieces.append(Rook('b', self.squares['H8']))
+        self.squares['H8'].occupied = True
+
+        self.pieces.append(Knight('b', self.squares['B8']))
+        self.squares['B8'].occupied = True
+
+        self.pieces.append(Knight('b', self.squares['G8']))
+        self.squares['G8'].occupied = True
+
+        self.pieces.append(Bishop('b', self.squares['C8']))
+        self.squares['C8'].occupied = True
+
+        self.pieces.append(Bishop('b', self.squares['F8']))
+        self.squares['F8'].occupied = True
+
+        self.pieces.append(Queen('b', self.squares['D8']))
+        self.squares['D8'].occupied = True
+
+        self.pieces.append(King('b', self.squares['E8']))
+        self.squares['E8'].occupied = True
+
+        # add other white pieces
+        self.pieces.append(Rook('w', self.squares['A8']))
+        self.squares['A1'].occupied = True
+
+        self.pieces.append(Rook('w', self.squares['H8']))
+        self.squares['H1'].occupied = True
+
+        self.pieces.append(Knight('w', self.squares['B8']))
+        self.squares['B1'].occupied = True
+
+        self.pieces.append(Knight('w', self.squares['G8']))
+        self.squares['G1'].occupied = True
+
+        self.pieces.append(Bishop('w', self.squares['C8']))
+        self.squares['C1'].occupied = True
+
+        self.pieces.append(Bishop('w', self.squares['F8']))
+        self.squares['F1'].occupied = True
+
+        self.pieces.append(Queen('w', self.squares['D8']))
+        self.squares['D1'].occupied = True
+
+        self.pieces.append(King('w', self.squares['E8']))
+        self.squares['E1'].occupied = True
 
 
-    def __str__(self):
-        printme = '    '
-        for letter in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']:
-            printme += f'{letter}      '
-        printme += '\n'
-        for index, row in enumerate(self.board):
-            printme += f'{8-index} '
-            for i in range(len(row)):
-                printme+= '| ' + str(row[i]) + ' '
-            printme += '|\n'
-        return printme
 
-class Player:
-    def __init__(self, colour):
-        self.colour = colour
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     board = Board()
-    print(board)
-    board.add_pieces()
-    print(board)
+    board.reset()
+    print(board[1,1])
