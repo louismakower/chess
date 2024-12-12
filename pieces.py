@@ -22,12 +22,14 @@ class Pawn(Piece):
         curr_col = self.square.location[1]
 
         if self.colour == 'w':
-            if curr_row == 2:
-                not_take_end_squares.append(board[curr_col, curr_row + 2])
-                not_take_end_squares.append(board[curr_col, curr_row + 1])
-            else:
-                not_take_end_squares.append(board[curr_col, curr_row + 1])
+            # maybe can move one square forward
+            not_take_end_squares.append(board[curr_col, curr_row + 1])
 
+            # if square ahead is free, and is in row 2 then can move 2 forward
+            if curr_row == 2 and not board[curr_col, curr_row + 1].occupied:
+                not_take_end_squares.append(board[curr_col, curr_row + 2])
+
+            # can take diagonally
             take_end_squares.append(board[curr_col + 1, curr_row + 1])
             take_end_squares.append(board[curr_col - 1, curr_row + 1])
 
@@ -37,7 +39,9 @@ class Pawn(Piece):
 
         for move in not_take_end_squares:
             if not move.occupied:
-                valid_moves.
+                valid_moves. # todo
+
+        # todo: also need to add that it can change into a queen
 
 class Rook(Piece):
     def __init__(self, colour: str, square):
