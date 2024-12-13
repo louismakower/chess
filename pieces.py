@@ -6,6 +6,7 @@ class Piece:
     def valid_moves(self, board):
         raise NotImplementedError
 
+
 class Pawn(Piece):
     def __init__(self, colour: str, square):
         super().__init__(colour, square)
@@ -18,30 +19,46 @@ class Pawn(Piece):
         take_end_squares = []
         valid_moves = []
 
-        curr_row = self.square.location[0]
-        curr_col = self.square.location[1]
+        curr_col = self.square.location[0]
+        curr_row = self.square.location[1]
 
-        if self.colour == 'w':
-            # maybe can move one square forward
-            not_take_end_squares.append(board[curr_col, curr_row + 1])
+        d_rows = {'b': -1, 'w': +1}
+        d_row = d_rows[self.colour]
 
-            # if square ahead is free, and is in row 2 then can move 2 forward
-            if curr_row == 2 and not board[curr_col, curr_row + 1].occupied:
-                not_take_end_squares.append(board[curr_col, curr_row + 2])
+        # maybe can move one square forward
+        not_take_end_squares.append(board[curr_col, curr_row + d_row])
 
-            # can take diagonally
-            take_end_squares.append(board[curr_col + 1, curr_row + 1])
-            take_end_squares.append(board[curr_col - 1, curr_row + 1])
+        # if square ahead is free, and is in row 2 then can move 2 forward
+        if curr_row == 2 and not board[curr_col, curr_row + d_row].occupant:
+            not_take_end_squares.append(board[curr_col, curr_row + 2*d_row])
+
+        try:
+            two_squares_ahead = board[curr_col, curr_row + 2 * d_row]
+        except ValueError:
+            # todo: implement turning into queen here
+            pass
+
+        # can take diagonally
+        try:
+            take_end_squares.append(board[curr_col + 1, curr_row + d_row])
+        except ValueError:
+            # outside the board
+            pass
+
+        try:
+            take_end_squares.append(board[curr_col - 1, curr_row + d_row])
+        except ValueError:
+            pass
 
         for move in take_end_squares:
-            if move.occupied:
+            if move.occupant.colour != self.colour:
                 valid_moves.append((move, True))
 
         for move in not_take_end_squares:
-            if not move.occupied:
-                valid_moves. # todo
+            if not move.occupant:
+                valid_moves.append((move, False))
 
-        # todo: also need to add that it can change into a queen
+        return valid_moves
 
 class Rook(Piece):
     def __init__(self, colour: str, square):

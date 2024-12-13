@@ -1,102 +1,86 @@
 from pieces import Pawn, Rook, Knight, Bishop, Queen, King
-row_labels = {1:'A', 2:'B', 3:'C', 4:'D', 5:'E', 6:'F', 7:'G', 8:'H'}
+col_labels = {1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E', 6: 'F', 7: 'G', 8: 'H'}
 
 class Square:
-    def __init__(self, colour, row, col):
+    def __init__(self, colour, col, row):
         self.colour = colour
-        self.occupied = False
-        self.location = (row, col)
-        self.label = f'{row_labels[row]}{col}'
+        self.occupant = False
+        self.location = (col, row)
+        self.label = f'{col_labels[col]}{row}'
 
     def __str__(self):
-        return str((self.location, self.label, self.occupied))
+        if self.occupant:
+            return str(self.occupant)
+        else:
+            return '   '
 
 class Board:
     def __init__(self):
         self.squares = {}
-        self.pieces = []
+        self.pieces = {}
 
-    def _make_board(self):
+    def make_board(self):
         colours = ['b', 'w']
         for row in range(1,9):
             for col in range(1,9):
-                self.squares[f'{row_labels[row]}{col}'] = Square(colours[(row+col)%2], row, col)
+                self.squares[f'{col_labels[col]}{row}'] = Square(colours[(row + col) % 2], col, row)
                 # (row+col)%2 ensures the colour switches in the correct way
 
+    def reset(self):
+        self.squares, self.pieces = {}, {}
+        self.make_board()
+
+        # add pawns
+        for col in range(1, 9):
+            # black pawns
+            curr_square = self.squares[f'{col_labels[col]}{7}']
+            curr_piece = Pawn('b', curr_square)
+            curr_square.occupant = curr_piece
+            self.pieces[curr_square.label] = curr_piece
+
+            # white pawns
+            curr_square = self.squares[f'{col_labels[col]}{2}']
+            curr_piece = Pawn('w', curr_square)
+            curr_square.occupant = curr_piece
+            self.pieces[curr_square.label] = curr_piece
+
+        blacks = [Rook('b', self.squares['A8']), Knight('b', self.squares['B8']), Bishop('b', self.squares['C8']),
+                  Queen('b', self.squares['D8']), King('b', self.squares['E8']),
+                  Bishop('b', self.squares['F8']), Knight('b', self.squares['G8']), Rook('b', self.squares['H8'])]
+
+        whites = [Rook('w', self.squares['A1']), Knight('w', self.squares['B1']), Bishop('w', self.squares['C1']),
+                  Queen('w', self.squares['D1']), King('w', self.squares['E1']),
+                  Bishop('w', self.squares['F1']), Knight('w', self.squares['G1']), Rook('w', self.squares['H1'])]
+
+        for col, piece in enumerate(blacks, start=1):
+            self.pieces[f'{col_labels[col]}{8}'] = piece
+            self.squares[f'{col_labels[col]}{8}'].occupant = piece
+
+        for col, piece in enumerate(whites, start=1):
+            self.pieces[f'{col_labels[col]}{1}'] = piece
+            self.squares[f'{col_labels[col]}{1}'].occupant = piece
 
     def __getitem__(self, coords):
-        row = coords[0]
-        col = coords[1]
-        return self.squares[f'{row_labels[row]}{col}']
+        col = coords[0]
+        row = coords[1]
+        if col < 1 or col > 8 or row < 1 or row > 8:
+            raise ValueError("outside board")
+        return self.squares[f'{col_labels[col]}{row}']
 
-    def reset(self):
-        self.squares, self.pieces = {}, []
-        self._make_board()
-        # add black pawns
-        for col in range(1,9):
-            curr_square = self.squares[f'{row_labels[7]}{col}']
-            curr_square.occupied = True
-            self.pieces.append(Pawn('b', curr_square))
+    def draw_board(self):
+        print_me = "   a    b    c    d    e    f    g    h   \n"
+        for row in range(1,9):
+            print_me += str(9-row) + ' '
+            for col in range(1, 9):
+                square = self[col, row]
+                print_me += str(square) + ' '
+            print_me += '\n'
 
-        # add white pawns
-        for col in range(1, 9):
-            curr_square = self.squares[f'{row_labels[2]}{col}']
-            curr_square.occupied = True
-            self.pieces.append(Pawn('w', curr_square))
-
-        # add other black pieces
-        self.pieces.append(Rook('b', self.squares['A8']))
-        self.squares['A8'].occupied = True
-
-        self.pieces.append(Rook('b', self.squares['H8']))
-        self.squares['H8'].occupied = True
-
-        self.pieces.append(Knight('b', self.squares['B8']))
-        self.squares['B8'].occupied = True
-
-        self.pieces.append(Knight('b', self.squares['G8']))
-        self.squares['G8'].occupied = True
-
-        self.pieces.append(Bishop('b', self.squares['C8']))
-        self.squares['C8'].occupied = True
-
-        self.pieces.append(Bishop('b', self.squares['F8']))
-        self.squares['F8'].occupied = True
-
-        self.pieces.append(Queen('b', self.squares['D8']))
-        self.squares['D8'].occupied = True
-
-        self.pieces.append(King('b', self.squares['E8']))
-        self.squares['E8'].occupied = True
-
-        # add other white pieces
-        self.pieces.append(Rook('w', self.squares['A8']))
-        self.squares['A1'].occupied = True
-
-        self.pieces.append(Rook('w', self.squares['H8']))
-        self.squares['H1'].occupied = True
-
-        self.pieces.append(Knight('w', self.squares['B8']))
-        self.squares['B1'].occupied = True
-
-        self.pieces.append(Knight('w', self.squares['G8']))
-        self.squares['G1'].occupied = True
-
-        self.pieces.append(Bishop('w', self.squares['C8']))
-        self.squares['C1'].occupied = True
-
-        self.pieces.append(Bishop('w', self.squares['F8']))
-        self.squares['F1'].occupied = True
-
-        self.pieces.append(Queen('w', self.squares['D8']))
-        self.squares['D1'].occupied = True
-
-        self.pieces.append(King('w', self.squares['E8']))
-        self.squares['E1'].occupied = True
-
+        print(print_me)
 
 
 if __name__ == '__main__':
     board = Board()
     board.reset()
-    print(board[1,1])
+    # print(board.pieces['A2'].valid_moves(board))
+    board.draw_board()
