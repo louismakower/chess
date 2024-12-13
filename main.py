@@ -12,7 +12,7 @@ class Square:
         if self.occupant:
             return str(self.occupant)
         else:
-            return '   '
+            return '    '
 
 class Board:
     def __init__(self):
@@ -68,13 +68,16 @@ class Board:
         return self.squares[f'{col_labels[col]}{row}']
 
     def draw_board(self):
-        print_me = "   a    b    c    d    e    f    g    h   \n"
-        for row in range(1,9):
-            print_me += str(9-row) + ' '
+        print_me = "     A    B    C    D    E    F    G    H\n"
+        print_me += "   " + "_"*41 + '\n'
+        for row in range(8,0,-1):
+            print_me += str(row) + ' | '
             for col in range(1, 9):
                 square = self[col, row]
                 print_me += str(square) + ' '
-            print_me += '\n'
+            print_me += '| ' + str(row) + '\n'
+        print_me += "   " + "_" * 41 + '\n'
+        print_me += "     A    B    C    D    E    F    G    H\n"
 
         print(print_me)
 
