@@ -1,59 +1,7 @@
 import copy
+from move import Move
 
-def get_diagonal_moves(curr_col, curr_row, colour, board, end_squares=None):
-    if end_squares is None:
-        end_squares = []
 
-    for direction in ['TLBR', 'TRBL']:  # top left bottom right and vice versa
-        for sign in [1, -1]:
-            d_pos = 1 * sign
-            while True:
-                if direction == 'TLBR':
-                    test_location = (curr_col - d_pos, curr_row + d_pos)
-                else:
-                    test_location = (curr_col + d_pos, curr_row + d_pos)
-
-                if not board.in_board(test_location):
-                    break
-
-                if board[test_location].occupant:
-                    if board[test_location].occupant.colour != colour:
-                        end_squares.append(board[test_location])
-                    break
-
-                else:
-                    end_squares.append(board[test_location])
-                    d_pos += sign
-
-    return end_squares
-
-def get_horizontal_moves(curr_col, curr_row, colour, board, end_squares=None):
-    if end_squares is None:
-        end_squares = []
-    for direction in ['vert', 'horz']:
-        for sign in [1, -1]:  # up/down or left/right
-            d_pos = 1 * sign  # will start in this direction
-            while True:
-                if direction == 'vert':
-                    test_location = (curr_col, curr_row + d_pos)
-                else:
-                    test_location = (curr_col + d_pos, curr_row)
-
-                if not board.in_board(test_location):
-                    break
-
-                # if there's a player there, can take it iff opposite colour
-                if board[test_location].occupant:
-                    if board[test_location].occupant.colour != colour:
-                        end_squares.append(board[test_location])
-                    # otherwise can't take it
-                    break
-
-                # if free square, can move there and beyond
-                else:
-                    end_squares.append(board[test_location])
-                    d_pos += sign  # increment in same direction
-    return end_squares
 
 class Piece:
     def __init__(self, colour: str, square):
@@ -61,18 +9,82 @@ class Piece:
         self.square = square
         self.moved = False
 
-    def moves(self, board):
+    def get_diagonal_moves(self, curr_col, curr_row, colour, board, end_squares=None):
+        if end_squares is None:
+            end_squares = []
+
+        for direction in ['TLBR', 'TRBL']:  # top left bottom right and vice versa
+            for sign in [1, -1]:
+                d_pos = 1 * sign
+                while True:
+                    if direction == 'TLBR':
+                        test_location = (curr_col - d_pos, curr_row + d_pos)
+                    else:
+                        test_location = (curr_col + d_pos, curr_row + d_pos)
+
+                    if not board.in_board(test_location):
+                        break
+
+                    if board[test_location].occupant:
+                        if board[test_location].occupant.colour != colour:
+                            end_squares.append(Move(self, self.square.location, board[test_location]))
+                        break
+
+                    else:
+                        end_squares.append(Move(self, self.square.location, board[test_location]))
+                        d_pos += sign
+
+        return end_squares
+
+    def get_horizontal_moves(self, curr_col, curr_row, colour, board, end_squares=None):
+        if end_squares is None:
+            end_squares = []
+        for direction in ['vert', 'horz']:
+            for sign in [1, -1]:  # up/down or left/right
+                d_pos = 1 * sign  # will start in this direction
+                while True:
+                    if direction == 'vert':
+                        test_location = (curr_col, curr_row + d_pos)
+                    else:
+                        test_location = (curr_col + d_pos, curr_row)
+
+                    if not board.in_board(test_location):
+                        break
+
+                    # if there's a player there, can take it iff opposite colour
+                    if board[test_location].occupant:
+                        if board[test_location].occupant.colour != colour:
+                            end_squares.append(Move(self, self.square.location, board[test_location]))
+                        # otherwise can't take it
+                        break
+
+                    # if free square, can move there and beyond
+                    else:
+                        end_squares.append(Move(self, self.square.location, board[test_location]))
+                        d_pos += sign  # increment in same direction
+        return end_squares
+
+    def including_check_moves(self, board):
         raise NotImplementedError
+
+    def valid_moves(self, board):
+        moves = self.including_check_moves(board)
+        valid_moves = []
+        for move in moves:
+            if not board.would_be_check(self.square.location, move.new.location, self.colour):
+                valid_moves.append(move)
+        return valid_moves
 
 class Pawn(Piece):
     def __init__(self, colour: str, square):
         super().__init__(colour, square)
         self.value = 1
+        self.label = f'{colour} P '
 
     def __str__(self):
-        return f'{self.colour} P '
+        return self.label
 
-    def moves(self, board):
+    def including_check_moves(self, board):
         end_squares = []
         curr_col = self.square.location[0]
         curr_row = self.square.location[1]
@@ -82,29 +94,25 @@ class Pawn(Piece):
 
         # can go one square forward if not occupied
         if (board.in_board((curr_col, curr_row + d_row)) and
-                not board[curr_col, curr_row + d_row].occupant and
-                not board.would_be_check(self.square.location, (curr_col, curr_row + d_row))):
-            end_squares.append(board[curr_col, curr_row + d_row])
+                not board[curr_col, curr_row + d_row].occupant):
+            end_squares.append(Move(self, self.square.location, board[curr_col, curr_row + d_row]))
 
         # if both squares ahead free, and pawn's first move then can move 2 forward
         if (board.in_board((curr_col, curr_row + 2*d_row)) and not self.moved
                 and not board[curr_col, curr_row + d_row].occupant
-                and not board[curr_col, curr_row + 2*d_row].occupant
-                and not board.would_be_check(self.square.location, (curr_col, curr_row + 2*d_row))):
-            end_squares.append(board[curr_col, curr_row + 2*d_row])
+                and not board[curr_col, curr_row + 2*d_row].occupant):
+            end_squares.append(Move(self, self.square.location, board[curr_col, curr_row + 2*d_row]))
 
         # can take diagonally if other colour present there
         if (board.in_board((curr_col+1, curr_row + d_row)) and
                 board[curr_col+1, curr_row + d_row].occupant
-                and board[curr_col+1, curr_row + d_row].occupant.colour != self.colour
-                and not board.would_be_check(self.square.location, (curr_col+1, curr_row + d_row))):
-            end_squares.append(board[curr_col+1, curr_row+d_row])
+                and board[curr_col+1, curr_row + d_row].occupant.colour != self.colour):
+            end_squares.append(Move(self, self.square.location, board[curr_col+1, curr_row+d_row]))
 
         if (board.in_board((curr_col-1, curr_row + d_row)) and
                 board[curr_col-1, curr_row + d_row].occupant
-                and board[curr_col+1, curr_row + d_row].occupant.colour != self.colour
-                and not board.would_be_check(self.square.location, (curr_col-1, curr_row + d_row))):
-            end_squares.append(board[curr_col-1, curr_row+d_row])
+                and board[curr_col-1, curr_row + d_row].occupant.colour != self.colour):
+            end_squares.append(Move(self, self.square.location, board[curr_col-1, curr_row+d_row]))
 
         return end_squares
 
@@ -112,15 +120,16 @@ class Rook(Piece):
     def __init__(self, colour: str, square):
         super().__init__(colour, square)
         self.value = 5
+        self.label = f'{colour} R '
 
     def __str__(self):
-        return f'{self.colour} R '
+        return self.label
 
-    def moves(self, board):
+    def including_check_moves(self, board):
         curr_col = self.square.location[0]
         curr_row = self.square.location[1]
 
-        end_squares = get_horizontal_moves(curr_col, curr_row, self.colour, board)
+        end_squares = self.get_horizontal_moves(curr_col, curr_row, self.colour, board)
 
         return end_squares
 
@@ -128,26 +137,28 @@ class Bishop(Piece):
     def __init__(self, colour: str, square):
         super().__init__(colour, square)
         self.value = 3
+        self.label = f'{colour} B '
 
     def __str__(self):
-        return f'{self.colour} B '
+        return self.label
 
-    def moves(self, board):
+    def including_check_moves(self, board):
         curr_col = self.square.location[0]
         curr_row = self.square.location[1]
 
-        end_squares = get_diagonal_moves(curr_col, curr_row, self.colour, board)
+        end_squares = self.get_diagonal_moves(curr_col, curr_row, self.colour, board)
         return end_squares
 
 class Knight(Piece):
     def __init__(self, colour: str, square):
         super().__init__(colour, square)
         self.value = 3
+        self.label = f'{colour} Kn'
 
     def __str__(self):
-        return f'{self.colour} Kn'
+        return self.label
 
-    def moves(self, board):
+    def including_check_moves(self, board):
         end_squares = []
 
         curr_col = self.square.location[0]
@@ -166,20 +177,23 @@ class Knight(Piece):
 
                     if board[test_location].occupant:
                         if board[test_location].occupant.colour != self.colour:
-                            end_squares.append(board[test_location])
+                            end_squares.append(Move(self, self.square.location, board[test_location]))
 
                     else:
-                        end_squares.append(board[test_location])
+                        end_squares.append(Move(self, self.square.location, board[test_location]))
 
         return end_squares
 
 class King(Piece):
     def __init__(self, colour: str, square):
         super().__init__(colour, square)
-    def __str__(self):
-        return f'{self.colour} K '
+        self.value = 0
+        self.label = f'{colour} K '
 
-    def moves(self, board):
+    def __str__(self):
+        return self.label
+
+    def including_check_moves(self, board):
         end_squares = []
 
         curr_col = self.square.location[0]
@@ -197,25 +211,25 @@ class King(Piece):
 
                 if board[test_location].occupant:
                     if board[test_location].occupant.colour != self.colour:
-                        end_squares.append(board[test_location])
+                        end_squares.append(Move(self, self.square.location, board[test_location]))
                 else:
-                    end_squares.append(board[test_location])
+                    end_squares.append(Move(self, self.square.location, board[test_location]))
         return end_squares
 
 class Queen(Piece):
     def __init__(self, colour: str, square):
         super().__init__(colour, square)
         self.value = 9
+        self.label = f'{colour} Q '
 
     def __str__(self):
-        return f'{self.colour} Q '
+        return self.label
 
-    def moves(self, board):
+    def including_check_moves(self, board):
         curr_col = self.square.location[0]
         curr_row = self.square.location[1]
 
-        # bishop moves
-        end_squares = get_diagonal_moves(curr_col, curr_row, self.colour, board)
-        end_squares = get_horizontal_moves(curr_col, curr_row, self.colour, board, end_squares)
+        end_squares = self.get_diagonal_moves(curr_col, curr_row, self.colour, board)
+        end_squares = self.get_horizontal_moves(curr_col, curr_row, self.colour, board, end_squares)
 
         return end_squares

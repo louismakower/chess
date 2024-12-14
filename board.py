@@ -1,6 +1,9 @@
+import copy
+
 from pieces import Pawn, Rook, Knight, Bishop, Queen, King
 col_labels = {1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E', 6: 'F', 7: 'G', 8: 'H'}
 reversed_col_labels = {'A': 1, 'B': 2, 'C':3, 'D':4, 'E':5, 'F':6, 'G':7, 'H':8}
+other_colour = {'b':'w', 'w':'b'}
 
 def convert(label):
     error_message = "Must be in form LETTER-NUMBER"
@@ -9,11 +12,11 @@ def convert(label):
     try:
         col = reversed_col_labels[label[0].upper()]
     except KeyError:
-        raise ValueError("col not found")
+        raise ValueError("Column not found")
     try:
         row = int(label[1])
     except Exception:
-        raise ValueError("row not found")
+        raise ValueError("Row not found")
     return col, row
 
 
@@ -34,6 +37,14 @@ class Board:
     def __init__(self):
         self.squares = {}
         self.pieces = {}
+        self.kings = {}
+
+    def get_pieces(self, colour):
+        colour_pieces = []
+        for piece in self.pieces.values():
+            if piece.colour == colour:
+                colour_pieces.append(piece)
+        return colour_pieces
 
     def make_board(self):
         colours = ['b', 'w']
@@ -71,10 +82,14 @@ class Board:
         for col, piece in enumerate(blacks, start=1):
             self.pieces[(col, 8)] = piece
             self[(col, 8)].occupant = piece
+            if isinstance(piece, King):
+                self.kings['b'] = piece
 
         for col, piece in enumerate(whites, start=1):
             self.pieces[(col, 1)] = piece
             self[col, 1].occupant = piece
+            if isinstance(piece, King):
+                self.kings['w'] = piece
 
     def __getitem__(self, coords):
         col = coords[0]
@@ -92,7 +107,7 @@ class Board:
         else:
             return False
 
-    def draw_board(self):
+    def draw(self):
         print_me = "     A    B    C    D    E    F    G    H\n"
         print_me += "   " + "_"*41 + '\n'
         for row in range(8,0,-1):
@@ -108,41 +123,64 @@ class Board:
 
     def move_piece(self, old_location, new_location):
         piece = self.pieces[old_location]
+        # move doesn't take anything
         if new_location not in self.pieces:
-            self.pieces[new_location] = piece
+            self.pieces[new_location] = piece # put in new square
             self[new_location].occupant = piece
-            self[old_location].occupant = False
-            piece.square = board[new_location]
+            self[old_location].occupant = False # remove from old square
+            piece.moved = True
+            piece.square = self[new_location]
             del self.pieces[old_location]
+        # move does take something
         elif self.pieces[new_location].colour != piece.colour:
             del self.pieces[new_location]
             self.pieces[new_location] = piece
             self[new_location].occupant = piece
             self[old_location].occupant = False
-            piece.square = board[new_location]
+            piece.moved = True
+            piece.square = self[new_location]
             del self.pieces[old_location]
         else:
             raise ValueError("Tried to take a piece of your own colour")
 
     def terminal(self):
-        return False
+        return False, ''
 
-    def would_be_check(self, old_location, new_location):
-        return False
+    def checkmate(self, colour):
+        if not self.in_check(colour):
+            return False
+        # for move in
+        # really this should check for checkmate
+        # num_kings = 0
+        # for piece in self.pieces.values():
+        #     if isinstance(piece, King):
+        #         num_kings += 1
+        #         colour = piece.colour
+        # if num_kings == 2:
+        #     return False, ''
+        # else:
+        #     return True, colour
 
-    def is_check(self):
-        pass
+    def would_be_check(self, old_location, new_location, colour):
+        new_board = copy.deepcopy(self)
+        new_board.move_piece(old_location, new_location)
+        check = new_board.in_check(colour)
+        del new_board
+        return check
+
+    def in_check(self, colour):
+        opponent_pieces = self.get_pieces(other_colour[colour])
+        for piece in opponent_pieces:
+            for move in piece.including_check_moves(self):
+                if move.new.location == self.kings[colour].square.location:
+                    return True
+        return False
 
 if __name__ == '__main__':
     board = Board()
     board.reset()
-    # print(board.pieces['A2'].valid_moves(board))
-    board.draw_board()
+    board.draw()
+    print(board.terminal())
 
-    board.move_piece((4,1), (4,3))
-    board.draw_board()
-    for a in board.pieces[(4,3)].moves(board):
-        pass
-        # print(a.location)
-
-    print(convert('Z2'))
+    board2 = copy.deepcopy(board)
+    print(board2.in_check('b'))
