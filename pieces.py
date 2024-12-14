@@ -1,74 +1,78 @@
-import copy
-from move import Move
-
-
+class Move:
+    def __init__(self, piece, old: tuple, new: tuple, captured_piece=None, castle=None):
+        self.piece = piece
+        self.old = old
+        self.new = new
+        self.captured_piece = captured_piece
+        self.is_first_move = not piece.moved
+        self.castle = castle
 
 class Piece:
-    def __init__(self, colour: str, square):
+    def __init__(self, colour: str, location):
         self.colour = colour
-        self.square = square
+        self.location = location
         self.moved = False
+        self.promoted_from = None
 
-    def get_diagonal_moves(self, curr_col, curr_row, colour, board, end_squares=None):
-        if end_squares is None:
-            end_squares = []
+    def __eq__(self, other):
+        if not isinstance(other, Piece):
+            return False
+        return (
+            self.colour == other.colour and
+            self.location == other.location and
+            self.moved == other.moved and
+            self.promoted_from == other.promoted_from and
+            self.__class__ == other.__class__
+        )
 
-        for direction in ['TLBR', 'TRBL']:  # top left bottom right and vice versa
-            for sign in [1, -1]:
-                d_pos = 1 * sign
-                while True:
-                    if direction == 'TLBR':
-                        test_location = (curr_col - d_pos, curr_row + d_pos)
-                    else:
-                        test_location = (curr_col + d_pos, curr_row + d_pos)
+    def get_diagonal_moves(self, curr_col, curr_row, colour, board, moves=None):
+        if moves is None:
+            moves = []
 
-                    if not board.in_board(test_location):
-                        break
+        for dcol, drow in [(1,1), (-1,-1), (1,-1), (-1,1)]:  # top left bottom right and vice versa
+            dpos = 1
+            while True:
+                test_location = (curr_col + dpos*dcol, curr_row + dpos*drow)
 
-                    if board[test_location].occupant:
-                        if board[test_location].occupant.colour != colour:
-                            end_squares.append(Move(self, self.square.location, test_location))
-                        break
+                if not board.in_board(test_location):
+                    break
 
-                    else:
-                        end_squares.append(Move(self, self.square.location, test_location))
-                        d_pos += sign
+                if board.squares[test_location].occupant:
+                    if board.squares[test_location].occupant.colour != colour:
+                        moves.append(Move(self, self.location, test_location))
+                    break
+                else:
+                    moves.append(Move(self, self.location, test_location))
+                    dpos += 1
 
-        return end_squares
+        return moves
 
-    def get_horizontal_moves(self, curr_col, curr_row, colour, board, end_squares=None):
-        if end_squares is None:
-            end_squares = []
-        for direction in ['vert', 'horz']:
-            for sign in [1, -1]:  # up/down or left/right
-                d_pos = 1 * sign  # will start in this direction
-                while True:
-                    if direction == 'vert':
-                        test_location = (curr_col, curr_row + d_pos)
-                    else:
-                        test_location = (curr_col + d_pos, curr_row)
+    def get_horizontal_moves(self, curr_col, curr_row, colour, board, moves=None):
+        if moves is None:
+            moves = []
+        for dcol, drow in [(1,0), (0,1), (-1,0), (0,-1)]:
+            dpos = 1
+            while True:
+                test_location = (curr_col + dpos*dcol, curr_row + dpos*drow)
+                if not board.in_board(test_location):
+                    break
+                # if there's a player there, can take it iff opposite colour
+                if board.squares[test_location].occupant:
+                    if board.squares[test_location].occupant.colour != colour:
+                        moves.append(Move(self, self.location, test_location))
+                    # otherwise can't take it
+                    break
+                # if free square, can move there and beyond
+                else:
+                    moves.append(Move(self, self.location, test_location))
+                    dpos += 1  # increment in same direction
+        return moves
 
-                    if not board.in_board(test_location):
-                        break
-
-                    # if there's a player there, can take it iff opposite colour
-                    if board[test_location].occupant:
-                        if board[test_location].occupant.colour != colour:
-                            end_squares.append(Move(self, self.square.location, test_location))
-                        # otherwise can't take it
-                        break
-
-                    # if free square, can move there and beyond
-                    else:
-                        end_squares.append(Move(self, self.square.location, test_location))
-                        d_pos += sign  # increment in same direction
-        return end_squares
-
-    def including_check_moves(self, board):
+    def possible_moves(self, board):
         raise NotImplementedError
 
     def valid_moves(self, board):
-        moves = self.including_check_moves(board)
+        moves = self.possible_moves(board)
         valid_moves = []
         for move in moves:
             if not board.would_be_check(move, self.colour):
@@ -76,128 +80,136 @@ class Piece:
         return valid_moves
 
 class Pawn(Piece):
-    def __init__(self, colour: str, square):
-        super().__init__(colour, square)
+    def __init__(self, colour: str, location):
+        super().__init__(colour, location)
         self.value = 1
         self.label = f'{colour} P '
+        self.name = 'pawn'
 
     def __str__(self):
         return self.label
 
-    def including_check_moves(self, board):
+    def possible_moves(self, board):
         end_squares = []
-        curr_col = self.square.location[0]
-        curr_row = self.square.location[1]
+        curr_col = self.location[0]
+        curr_row = self.location[1]
 
         d_rows = {'b': -1, 'w': +1}
         d_row = d_rows[self.colour]
 
         # can go one square forward if not occupied
         if (board.in_board((curr_col, curr_row + d_row)) and
-                not board[curr_col, curr_row + d_row].occupant):
-            end_squares.append(Move(self, self.square.location, (curr_col, curr_row + d_row)))
+                not board.squares[curr_col, curr_row + d_row].occupant):
+            end_squares.append(Move(self, self.location, (curr_col, curr_row + d_row)))
 
         # if both squares ahead free, and pawn's first move then can move 2 forward
         if (board.in_board((curr_col, curr_row + 2*d_row)) and not self.moved
-                and not board[curr_col, curr_row + d_row].occupant
-                and not board[curr_col, curr_row + 2*d_row].occupant):
-            end_squares.append(Move(self, self.square.location, (curr_col, curr_row + 2*d_row)))
+                and not board.squares[curr_col, curr_row + d_row].occupant
+                and not board.squares[curr_col, curr_row + 2*d_row].occupant):
+            end_squares.append(Move(self, self.location, (curr_col, curr_row + 2*d_row)))
 
         # can take diagonally if other colour present there
         if (board.in_board((curr_col+1, curr_row + d_row)) and
-                board[curr_col+1, curr_row + d_row].occupant
-                and board[curr_col+1, curr_row + d_row].occupant.colour != self.colour):
-            end_squares.append(Move(self, self.square.location, (curr_col+1, curr_row+d_row)))
+                board.squares[curr_col+1, curr_row + d_row].occupant
+                and board.squares[curr_col+1, curr_row + d_row].occupant.colour != self.colour):
+            end_squares.append(Move(self, self.location, (curr_col+1, curr_row+d_row)))
 
         if (board.in_board((curr_col-1, curr_row + d_row)) and
-                board[curr_col-1, curr_row + d_row].occupant
-                and board[curr_col-1, curr_row + d_row].occupant.colour != self.colour):
-            end_squares.append(Move(self, self.square.location, (curr_col-1, curr_row+d_row)))
+                board.squares[curr_col-1, curr_row + d_row].occupant
+                and board.squares[curr_col-1, curr_row + d_row].occupant.colour != self.colour):
+            end_squares.append(Move(self, self.location, (curr_col-1, curr_row+d_row)))
 
         return end_squares
 
 class Rook(Piece):
-    def __init__(self, colour: str, square):
-        super().__init__(colour, square)
+    def __init__(self, colour: str, location):
+        super().__init__(colour, location)
         self.value = 5
         self.label = f'{colour} R '
+        self.name = 'rook'
 
     def __str__(self):
         return self.label
 
-    def including_check_moves(self, board):
-        curr_col = self.square.location[0]
-        curr_row = self.square.location[1]
+    def possible_moves(self, board):
+        curr_col = self.location[0]
+        curr_row = self.location[1]
 
-        end_squares = self.get_horizontal_moves(curr_col, curr_row, self.colour, board)
+        moves = self.get_horizontal_moves(curr_col, curr_row, self.colour, board)
+        castle_rooks = board.get_castle_rooks(self.colour)
+        if self.location in castle_rooks:
+            moves.append(self.castle(board))
+        return moves
 
-        return end_squares
+    def castle(self, board):
+        castle_rooks = board.get_castle_rooks(self.colour)
+        new_r = castle_rooks[self.location][0]
+        new_k = castle_rooks[self.location][1]
+        king = board.kings()[self.colour]
+        k_move = Move(king, king.location, new_k)
+        return Move(self, self.location, new_r, castle=k_move)
 
 class Bishop(Piece):
-    def __init__(self, colour: str, square):
-        super().__init__(colour, square)
+    def __init__(self, colour: str, location):
+        super().__init__(colour, location)
         self.value = 3
         self.label = f'{colour} B '
+        self.name = 'bishop'
 
     def __str__(self):
         return self.label
 
-    def including_check_moves(self, board):
-        curr_col = self.square.location[0]
-        curr_row = self.square.location[1]
+    def possible_moves(self, board):
+        curr_col = self.location[0]
+        curr_row = self.location[1]
 
         end_squares = self.get_diagonal_moves(curr_col, curr_row, self.colour, board)
         return end_squares
 
 class Knight(Piece):
-    def __init__(self, colour: str, square):
-        super().__init__(colour, square)
+    def __init__(self, colour: str, location):
+        super().__init__(colour, location)
         self.value = 3
         self.label = f'{colour} Kn'
+        self.name = 'knight'
 
     def __str__(self):
         return self.label
 
-    def including_check_moves(self, board):
+    def possible_moves(self, board):
         end_squares = []
 
-        curr_col = self.square.location[0]
-        curr_row = self.square.location[1]
+        curr_col = self.location[0]
+        curr_row = self.location[1]
 
-        for direction2 in ['vert', 'horz']: # direction to move 2 cells in
-            for sign in [1, -1]: # left/right or up/down for 2 cell move
-                for direction1 in [1, -1]: # left/right or up/down for 1 cell move
-                    if direction2 == 'vert':
-                        test_location = (curr_col + direction1, curr_row + 2*sign)
-                    else:
-                        test_location = (curr_col + 2*sign, curr_row + direction1)
+        for dcol, drow in [(2,1), (2,-1), (-2, 1), (-2, -1), (1,2), (1,-2), (-1, 2), (-1, -2)]:
+            test_location = curr_col + dcol, curr_row + drow
 
-                    if not board.in_board(test_location):
-                        continue
+            if not board.in_board(test_location):
+                continue
 
-                    if board[test_location].occupant:
-                        if board[test_location].occupant.colour != self.colour:
-                            end_squares.append(Move(self, self.square.location, test_location))
-
-                    else:
-                        end_squares.append(Move(self, self.square.location, test_location))
-
+            if board.squares[test_location].occupant:
+                if board.squares[test_location].occupant.colour != self.colour:
+                    end_squares.append(Move(self, self.location, test_location))
+            else:
+                end_squares.append(Move(self, self.location, test_location))
         return end_squares
 
 class King(Piece):
-    def __init__(self, colour: str, square):
-        super().__init__(colour, square)
+    def __init__(self, colour: str, location):
+        super().__init__(colour, location)
         self.value = 0
         self.label = f'{colour} K '
+        self.name = 'king'
 
     def __str__(self):
         return self.label
 
-    def including_check_moves(self, board):
+    def possible_moves(self, board):
         end_squares = []
 
-        curr_col = self.square.location[0]
-        curr_row = self.square.location[1]
+        curr_col = self.location[0]
+        curr_row = self.location[1]
 
         directions = [
             (0, 1), (0, -1),  # Vertical
@@ -212,25 +224,26 @@ class King(Piece):
             if not board.in_board(test_location):
                 continue
 
-            if board[test_location].occupant:
-                if board[test_location].occupant.colour != self.colour:
-                    end_squares.append(Move(self, self.square.location, test_location))
+            if board.squares[test_location].occupant:
+                if board.squares[test_location].occupant.colour != self.colour:
+                    end_squares.append(Move(self, self.location, test_location))
             else:
-                end_squares.append(Move(self, self.square.location, test_location))
+                end_squares.append(Move(self, self.location, test_location))
         return end_squares
 
 class Queen(Piece):
-    def __init__(self, colour: str, square):
-        super().__init__(colour, square)
+    def __init__(self, colour: str, location):
+        super().__init__(colour, location)
         self.value = 9
         self.label = f'{colour} Q '
+        self.name = 'queen'
 
     def __str__(self):
         return self.label
 
-    def including_check_moves(self, board):
-        curr_col = self.square.location[0]
-        curr_row = self.square.location[1]
+    def possible_moves(self, board):
+        curr_col = self.location[0]
+        curr_row = self.location[1]
 
         end_squares = self.get_diagonal_moves(curr_col, curr_row, self.colour, board)
         end_squares = self.get_horizontal_moves(curr_col, curr_row, self.colour, board, end_squares)

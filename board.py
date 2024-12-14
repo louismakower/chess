@@ -1,11 +1,11 @@
 import copy
+from pieces import Pawn, Rook, Knight, Bishop, Queen, King, Move
 
-from pieces import Pawn, Rook, Knight, Bishop, Queen, King
 col_labels = {1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E', 6: 'F', 7: 'G', 8: 'H'}
 reversed_col_labels = {'A': 1, 'B': 2, 'C':3, 'D':4, 'E':5, 'F':6, 'G':7, 'H':8}
-other_colour = {'b':'w', 'w':'b'}
+other_player = {'b': 'w', 'w': 'b'}
 
-def convert(label):
+def label_to_coordinates(label):
     error_message = "Must be in form LETTER-NUMBER"
     assert len(label) == 2, error_message
 
@@ -19,11 +19,15 @@ def convert(label):
         raise ValueError("Row not found")
     return col, row
 
+def coordinates_to_label(coordinates):
+    col, row = coordinates
+    col = col_labels[col]
+    return str(col)+str(row)
 
 class Square:
     def __init__(self, colour, col, row):
         self.colour = colour
-        self.occupant = False
+        self.occupant = None
         self.location = (col, row)
         self.label = f'{col_labels[col]}{row}'
 
@@ -33,18 +37,41 @@ class Square:
         else:
             return '    '
 
+    def __eq__(self, other):
+        if not isinstance(other, Square):
+            return False
+        return (self.colour == other.colour and
+                self.occupant == other.occupant and
+                self.location == other.location)
+
 class Board:
     def __init__(self):
         self.squares = {}
-        self.pieces = {}
-        self.kings = {}
 
-    def get_pieces(self, colour):
-        colour_pieces = []
-        for piece in self.pieces.values():
-            if piece.colour == colour:
-                colour_pieces.append(piece)
-        return colour_pieces
+    def __eq__(self, other):
+        if not isinstance(other, Board):
+            return False
+
+        # Compare all squares
+        for location, square in self.squares.items():
+            other_square = other.squares.get(location)
+            if other_square is None or square != other_square:
+                return False
+
+        return True
+
+    def get_pieces(self):
+        return {square.location: square.occupant for square in self.squares.values() if square.occupant}
+
+    def kings(self):
+        kings = {}
+        for piece in self.get_pieces().values():
+            if isinstance(piece, King):
+                kings[piece.colour] = piece
+        return kings
+
+    def get_coloured_pieces(self, colour):
+        return [piece for piece in self.get_pieces().values() if piece.colour == colour]
 
     def make_board(self):
         colours = ['b', 'w']
@@ -54,49 +81,34 @@ class Board:
                 # (row+col)%2 ensures the colour switches in the correct way
 
     def reset(self):
-        self.squares, self.pieces = {}, {}
+        self.squares = {}
         self.make_board()
 
         # add pawns
         for col in range(1, 9):
             # black pawns
-            curr_square = self[(col, 7)]
-            curr_piece = Pawn('b', curr_square)
+            curr_square = self.squares[(col, 7)]
+            curr_piece = Pawn('b', curr_square.location)
             curr_square.occupant = curr_piece
-            self.pieces[curr_square.location] = curr_piece
 
             # white pawns
-            curr_square = self[(col, 2)]
-            curr_piece = Pawn('w', curr_square)
+            curr_square = self.squares[(col, 2)]
+            curr_piece = Pawn('w', curr_square.location)
             curr_square.occupant = curr_piece
-            self.pieces[curr_square.location] = curr_piece
 
-        blacks = [Rook('b', self[(1,8)]), Knight('b', self[(2,8)]), Bishop('b', self[(3,8)]),
-                  Queen('b', self[(4,8)]), King('b', self[(5,8)]),
-                  Bishop('b', self[(6,8)]), Knight('b', self[(7,8)]), Rook('b', self[(8,8)])]
+        blacks = [Rook('b', (1,8)), Knight('b', (2,8)), Bishop('b', (3,8)),
+                  Queen('b',(4,8)), King('b', (5,8)),
+                  Bishop('b', (6,8)), Knight('b', (7,8)), Rook('b', (8,8))]
 
-        whites = [Rook('w', self[(1,1)]), Knight('w', self[(2,1)]), Bishop('w', self[(3,1)]),
-                  Queen('w', self[(4,1)]), King('w', self[(5,1)]),
-                  Bishop('w', self[(6,1)]), Knight('w', self[(7,1)]), Rook('w', self[(8,1)])]
+        whites = [Rook('w', (1,1)), Knight('w', (2,1)), Bishop('w', (3,1)),
+                  Queen('w', (4,1)), King('w', (5,1)),
+                  Bishop('w', (6,1)), Knight('w', (7,1)), Rook('w', (8,1))]
 
         for col, piece in enumerate(blacks, start=1):
-            self.pieces[(col, 8)] = piece
-            self[(col, 8)].occupant = piece
-            if isinstance(piece, King):
-                self.kings['b'] = piece
+            self.squares[(col, 8)].occupant = piece
 
         for col, piece in enumerate(whites, start=1):
-            self.pieces[(col, 1)] = piece
-            self[col, 1].occupant = piece
-            if isinstance(piece, King):
-                self.kings['w'] = piece
-
-    def __getitem__(self, coords):
-        col = coords[0]
-        row = coords[1]
-        if col < 1 or col > 8 or row < 1 or row > 8:
-            raise ValueError("outside board")
-        return self.squares[(col, row)]
+            self.squares[(col, 1)].occupant = piece
 
     @staticmethod
     def in_board(coords):
@@ -108,64 +120,220 @@ class Board:
             return False
 
     def draw(self):
-        print_me = "     A    B    C    D    E    F    G    H\n"
+        print_me = "      A     B     C     D     E     F     G     H\n"
         print_me += "   " + "_"*41 + '\n'
         for row in range(8,0,-1):
-            print_me += str(row) + ' | '
+            print_me += str(row) + ' || '
             for col in range(1, 9):
-                square = self[col, row]
-                print_me += str(square) + ' '
+                square = self.squares[col, row]
+                print_me += str(square) + ' |'
             print_me += '| ' + str(row) + '\n\n'
         print_me += "   " + "_" * 41 + '\n'
-        print_me += "     A    B    C    D    E    F    G    H\n"
+        print_me += "      A     B     C     D     E     F     G     H\n"
 
         print(print_me)
 
-    def move_piece(self, move):
-        old_location = move.old
-        new_location = move.new
+    def update_board_in_move(self, move):
         piece = move.piece
+
+        # Record the captured piece
+        move.captured_piece = self.squares[move.new].occupant
+
+        # update the board
+        self.squares[move.new].occupant = piece # put in new square
+        self.squares[move.old].occupant = None  # remove from old square
+
+        # update the piece
+        piece.location = move.new
+        piece.moved = True
+
+        # check promotion
+        self.promotion(piece)
+
+    def move_piece(self, move: Move):
+        if move.castle:
+            self.move_piece(move.castle)
         # move doesn't take anything
-        if new_location not in self.pieces:
-            self.pieces[new_location] = piece # put in new square
-            self[new_location].occupant = piece
-            self[old_location].occupant = False # remove from old square
-            piece.moved = True
-            piece.square = self[new_location]
-            del self.pieces[old_location]
+        if move.new not in self.get_pieces():
+            self.update_board_in_move(move)
+
         # move does take something
-        elif self.pieces[new_location].colour != piece.colour:
-            del self.pieces[new_location]
-            self.pieces[new_location] = piece
-            self[new_location].occupant = piece
-            self[old_location].occupant = False
-            piece.moved = True
-            piece.square = self[new_location]
-            del self.pieces[old_location]
+        elif self.get_pieces()[move.new].colour != move.piece.colour:
+            self.update_board_in_move(move)
         else:
-            raise ValueError("Tried to take a piece of your own colour")
+            raise TypeError("Tried to take a piece of your own colour")
+
+    def undo_move(self, move: Move):
+        """
+        Undo a move on the board, restoring the board and piece states to before the move.
+        """
+        if move.castle:
+            self.undo_move(move.castle)
+        # Retrieve the piece involved in the move
+        piece = move.piece
+
+        # Revert the piece's location and moved status
+        self.squares[move.old].occupant = piece
+        self.squares[move.new].occupant = move.captured_piece  # Restore captured piece, if any
+        piece.location = move.old
+
+        # Reset the moved flag if the move was the piece's first move
+        if move.is_first_move:
+            piece.moved = False
+
+        if move.piece.promoted_from:
+            # Revert to the original pawn
+            self.squares[move.old].occupant = move.piece.promoted_from
+            move.piece.promoted_from = None  # Clear the reference to avoid reusing it
+        else:
+            self.squares[move.old].occupant = piece
 
     def would_be_check(self, move, colour):
-        new_board = copy.deepcopy(self)
-        new_move = copy.deepcopy(move)
-        new_board.move_piece(new_move)
-        check = new_board.in_check(colour)
-        del new_board
-        del new_move
+        self.move_piece(move)
+        check = self.in_check(colour)
+        self.undo_move(move)
         return check
 
-    def in_check(self, colour):
-        opponent_pieces = self.get_pieces(other_colour[colour])
-        for piece in opponent_pieces:
-            for move in piece.including_check_moves(self):
-                if move.new == self.kings[colour].square.location:
+    def in_check(self, k_colour):
+        k_col, k_row = self.kings()[k_colour].location
+
+        # check by pawn
+        pawn_direction = -1 if k_colour == 'b' else 1
+        for dcol, drow in [(1, pawn_direction), (-1, pawn_direction)]:
+            test_location = k_col + dcol, k_row + drow
+            if not self.in_board(test_location):
+                continue
+            occupant = self.squares[test_location].occupant
+            if occupant:
+                if occupant.colour != k_colour and isinstance(occupant, Pawn):
                     return True
+
+        # check by rook or queen
+        for dcol, drow in [(1,0), (-1,0), (0,1), (0,-1)]:
+            dpos = 1
+            while True:
+                test_location = k_col + dpos*dcol, k_row + dpos*drow
+                if not self.in_board(test_location):
+                    break
+                occupant = self.squares[test_location].occupant
+                if occupant:
+                    if occupant.colour != k_colour and (isinstance(occupant, Rook)
+                                                        or isinstance(occupant, Queen)):
+                        return True
+                    break
+                dpos += 1
+
+        # check by rook or queen
+        for dcol, drow in [(1, 1), (-1, -1), (-1, 1), (1, -1)]:
+            dpos = 1
+            while True:
+                test_location = k_col + dpos * dcol, k_row + dpos * drow
+                if not self.in_board(test_location):
+                    break
+                occupant = self.squares[test_location].occupant
+                if occupant:
+                    if occupant.colour != k_colour and (isinstance(occupant, Bishop)
+                                                        or isinstance(occupant, Queen)):
+                        return True
+                    break
+                dpos += 1
+
+        # check by knight
+        for dcol, drow in [(2, 1), (2, -1), (-2, 1), (-2, -1), (1, 2), (1, -2), (-1, 2), (-1, -2)]:
+            test_location = k_col + dcol, k_row + drow
+            if not self.in_board(test_location):
+                continue
+            occupant = self.squares[test_location].occupant
+            if occupant:
+                if occupant.colour != k_colour and isinstance(occupant, Knight):
+                    return True
+
+        # next to other king
+        for dcol, drow in [(0, 1), (1, 0), (-1, 0), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)]:
+            test_location = k_col + dcol, k_row + drow
+            if not self.in_board(test_location):
+                continue
+            occupant = self.squares[test_location].occupant
+            if occupant:
+                if occupant.colour != k_colour and isinstance(occupant, King):
+                    return True
+        return False
+
+    def promotion(self, piece):
+        if isinstance(piece, Pawn) and piece.promoted_from is None:
+            if (piece.colour == 'w' and piece.location[1] == 8) or (piece.colour == 'b' and piece.location[1] == 1):
+                new_queen = Queen(piece.colour, piece.location)
+                new_queen.promoted_from = piece
+                self.squares[new_queen.location].occupant = new_queen
+                piece.promoted_from = None  # Ensure this is only set for promoted pawns
+
+    def get_castle_rooks(self, colour):
+        castle_rooks = {}
+        king = self.kings()[colour]
+
+        if king.moved:
+            # can't castle if king already been moved
+            return {}
+
+        if self.in_check(colour):
+            # can't castle out of check
+            return {}
+
+        rooks = [piece for piece in self.get_coloured_pieces(colour) if isinstance(piece, Rook) and piece.colour == colour]
+        k_col, row = king.location
+
+        for rook in rooks:
+            if rook.moved:
+                # can't castle if rook already been mved
+                continue
+            castle = True
+            col = rook.location[0]
+            d_col = 1 if k_col > col else -1
+            col += d_col
+            while col != k_col:
+                if self.squares[(col, row)].occupant:
+                    castle = False
+                    break
+                col += d_col
+            if castle:
+                new_rook_col = k_col - d_col
+                new_k_col = k_col - 2*d_col
+                castle_rooks[rook.location] = [(new_rook_col, row), (new_k_col, row)]
+        return castle_rooks
+
+    def get_colour_moves(self, colour):
+        moves = []
+        for piece in self.get_coloured_pieces(colour):
+            for move in piece.valid_moves(self):
+                moves.append(move)
+        return moves
+
+    def result(self, colour):
+        if len(self.get_colour_moves(colour)) == 0:
+            if self.in_check(colour):
+                return 'checkmate'
+            else:
+                return 'stalemate'
+        if len(self.get_pieces()) == 2:
+            return 'stalemate'
         return False
 
 if __name__ == '__main__':
     board = Board()
     board.reset()
     board.draw()
-
     board2 = copy.deepcopy(board)
-    print(board2.in_check('b'))
+
+    move = Move(board.get_pieces()[(2, 8)], (2, 8), (2, 6))
+    board.move_piece(move)
+    move2 = Move(board.get_pieces()[(3, 8)], (3, 8), (3, 6))
+    board.move_piece(move2)
+    move3 = Move(board.get_pieces()[(4, 8)], (4, 8), (4, 6))
+    board.move_piece(move3)
+
+    move = Move(board.get_pieces()[(6, 8)], (6, 8), (6, 6))
+    board.move_piece(move)
+    move2 = Move(board.get_pieces()[(7, 8)], (7, 8), (7, 6))
+    board.move_piece(move2)
+    board.draw()
+    print(board.get_castle_rooks('b'))

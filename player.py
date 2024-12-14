@@ -1,23 +1,17 @@
-from board import convert
-from move import Move
 import random
+from board import label_to_coordinates
+from pieces import Move
 
 class Player:
     def __init__(self, colour, board):
+        assert colour in {'w', 'b'}
         self.colour = colour
         self.board = board
-
-    def all_moves(self):
-        moves = []
-        for piece in self.board.get_pieces(self.colour):
-            for move in piece.valid_moves(self.board):
-                moves.append(move)
-        return moves
 
     def make_move(self):
         raise NotImplementedError
 
-class ManualPlayer(Player):
+class HumanPlayer(Player):
     def __init__(self, colour, board):
         super().__init__(colour, board)
 
@@ -46,7 +40,7 @@ class ManualPlayer(Player):
                         new_coordinates = self.ask_for_location(piece)
                         valid_end = True
                     except KeyError as e:
-                        valid_moves = [self.board[move.new].label for move in piece.valid_moves(self.board)]
+                        valid_moves = [self.board.squares[move.new].label for move in piece.valid_moves(self.board)]
                         print(e)
                         print(valid_moves)
                     except ValueError:
@@ -54,29 +48,34 @@ class ManualPlayer(Player):
                         valid_piece = False
                     except AssertionError as e:
                         print(e)
-
-        move = Move(piece, piece.square.location, new_coordinates)
-        self.board.move_piece(move)
+        if new_coordinates == 'castle':
+            move = piece.castle(self.board)
+        else:
+            move = Move(piece, piece.location, new_coordinates)
         return move
 
     def ask_for_piece(self):
-        piece_to_move = input("Enter the label of the piece to move: ")
-        old_coordinates = convert(piece_to_move)
+        piece_to_move = input("[Enter the rook's location if you want to castle]\nEnter the label of the piece to move: ")
+        old_coordinates = label_to_coordinates(piece_to_move)
         try:
-            piece = self.board.pieces[old_coordinates]
+            piece = self.board.get_pieces()[old_coordinates]
         except KeyError:
             raise KeyError("There is no piece in this square, or the square is outside the board")
         assert piece.colour == self.colour, "You can only move your own pieces"
         return piece
 
     def ask_for_location(self, piece):
-        old_coordinates = piece.square.location
-        move_to = input(f"[Enter np to pick a new piece]\nEnter the label of the location to move {old_coordinates} to: ")
-
+        old_coordinates = piece.location
+        move_to = input(f"[Enter np to pick a new piece]\n[Enter 'castle' to castle]\nEnter the label of the location to move {old_coordinates} to: ")
         if move_to == 'np':
             print("Select a new piece...")
             raise ValueError
-        new_coordinates = convert(move_to)
+        if move_to == 'castle':
+            if not any(move.castle for move in piece.valid_moves(self.board)):
+                raise KeyError("Can't castle at the moment")
+            else:
+                return 'castle'
+        new_coordinates = label_to_coordinates(move_to)
         if new_coordinates not in [move.new for move in piece.valid_moves(self.board)]:
             raise KeyError("Not a valid move")
         else:
@@ -85,27 +84,8 @@ class ManualPlayer(Player):
 class RandomPlayer(Player):
     def __init__(self, colour, board):
         super().__init__(colour, board)
-        self.pieces = [piece for piece in board.pieces.values() if piece.colour == self.colour]
-
-    def select_random_piece(self):
-        piece = random.choice(self.pieces)
-        return piece
-
-    def select_random_move(self, piece):
-        move = random.choice(piece.valid_moves(self.board))
-        return move
 
     def make_move(self):
-        valid_piece = False
-        while not valid_piece:
-            piece = self.select_random_piece()
-            if len(piece.valid_moves(self.board)) > 0:
-                valid_piece = True
-        move = self.select_random_move(piece)
-
-
-        self.board.move_piece(move)
+        move = random.choice(self.board.get_colour_moves(self.colour))
         return move
 
-class AutomaticPlayer(Player):
-    pass
