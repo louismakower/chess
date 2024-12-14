@@ -1,4 +1,5 @@
 from board import convert
+from move import Move
 import random
 
 class Player:
@@ -12,6 +13,9 @@ class Player:
             for move in piece.valid_moves(self.board):
                 moves.append(move)
         return moves
+
+    def make_move(self):
+        raise NotImplementedError
 
 class ManualPlayer(Player):
     def __init__(self, colour, board):
@@ -42,7 +46,7 @@ class ManualPlayer(Player):
                         new_coordinates = self.ask_for_location(piece)
                         valid_end = True
                     except KeyError as e:
-                        valid_moves = [move.new.label for move in piece.valid_moves(self.board)]
+                        valid_moves = [self.board[move.new].label for move in piece.valid_moves(self.board)]
                         print(e)
                         print(valid_moves)
                     except ValueError:
@@ -51,7 +55,9 @@ class ManualPlayer(Player):
                     except AssertionError as e:
                         print(e)
 
-        self.board.move_piece(piece.square.location, new_coordinates)
+        move = Move(piece, piece.square.location, new_coordinates)
+        self.board.move_piece(move)
+        return move
 
     def ask_for_piece(self):
         piece_to_move = input("Enter the label of the piece to move: ")
@@ -71,7 +77,7 @@ class ManualPlayer(Player):
             print("Select a new piece...")
             raise ValueError
         new_coordinates = convert(move_to)
-        if self.board.squares[new_coordinates] not in [move.new for move in piece.valid_moves(self.board)]:
+        if new_coordinates not in [move.new for move in piece.valid_moves(self.board)]:
             raise KeyError("Not a valid move")
         else:
             return new_coordinates
@@ -96,7 +102,10 @@ class RandomPlayer(Player):
             if len(piece.valid_moves(self.board)) > 0:
                 valid_piece = True
         move = self.select_random_move(piece)
-        self.board.move_piece(piece.square.location, move.new.location)
+
+
+        self.board.move_piece(move)
+        return move
 
 class AutomaticPlayer(Player):
     pass

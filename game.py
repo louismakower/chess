@@ -17,19 +17,29 @@ class Game:
         else:
             self.current_player = self.p_black
 
-    def announce_winner(self, colour):
-        print(f'{colour.upper()} wins')
+    def checkmate(self, player):
+        if not self.board.in_check(player.colour):
+            return False
+        if len(player.all_moves()) > 0:
+            return False
+        return True
+
+    def announce_loser(self):
+        print(f'{self.current_player.colour} loses')
+
+    def announce_move(self, move):
+        printme = f'{self.current_player.colour.upper()} moved {move.piece.label} from {move.old} to {move.new}'
+        print(printme)
 
     def play(self):
-        while not self.board.terminal()[0]:
+        while not self.checkmate(self.current_player):
             self.board.draw()
             self.announce_player()
-            self.current_player.make_move()
+            move = self.current_player.make_move()
+            self.announce_move(move)
             self.switch_player()
-            if self.board.terminal()[0]:
-                winner = self.board.terminal()[1]
-                break
-        self.announce_winner(winner)
+        self.board.draw()
+        self.announce_loser()
 
 
 if __name__ == "__main__":

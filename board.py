@@ -121,8 +121,10 @@ class Board:
 
         print(print_me)
 
-    def move_piece(self, old_location, new_location):
-        piece = self.pieces[old_location]
+    def move_piece(self, move):
+        old_location = move.old
+        new_location = move.new
+        piece = move.piece
         # move doesn't take anything
         if new_location not in self.pieces:
             self.pieces[new_location] = piece # put in new square
@@ -143,36 +145,20 @@ class Board:
         else:
             raise ValueError("Tried to take a piece of your own colour")
 
-    def terminal(self):
-        return False, ''
-
-    def checkmate(self, colour):
-        if not self.in_check(colour):
-            return False
-        # for move in
-        # really this should check for checkmate
-        # num_kings = 0
-        # for piece in self.pieces.values():
-        #     if isinstance(piece, King):
-        #         num_kings += 1
-        #         colour = piece.colour
-        # if num_kings == 2:
-        #     return False, ''
-        # else:
-        #     return True, colour
-
-    def would_be_check(self, old_location, new_location, colour):
+    def would_be_check(self, move, colour):
         new_board = copy.deepcopy(self)
-        new_board.move_piece(old_location, new_location)
+        new_move = copy.deepcopy(move)
+        new_board.move_piece(new_move)
         check = new_board.in_check(colour)
         del new_board
+        del new_move
         return check
 
     def in_check(self, colour):
         opponent_pieces = self.get_pieces(other_colour[colour])
         for piece in opponent_pieces:
             for move in piece.including_check_moves(self):
-                if move.new.location == self.kings[colour].square.location:
+                if move.new == self.kings[colour].square.location:
                     return True
         return False
 
@@ -180,7 +166,6 @@ if __name__ == '__main__':
     board = Board()
     board.reset()
     board.draw()
-    print(board.terminal())
 
     board2 = copy.deepcopy(board)
     print(board2.in_check('b'))
