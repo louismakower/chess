@@ -96,6 +96,7 @@ class Board:
             curr_piece = Pawn('w', curr_square.location)
             curr_square.occupant = curr_piece
 
+        # other pieces
         blacks = [Rook('b', (1,8)), Knight('b', (2,8)), Bishop('b', (3,8)),
                   Queen('b',(4,8)), King('b', (5,8)),
                   Bishop('b', (6,8)), Knight('b', (7,8)), Rook('b', (8,8))]
